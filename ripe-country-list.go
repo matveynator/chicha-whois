@@ -136,7 +136,7 @@ func updateRIPEdb() {
         return
     }
 
-    fmt.Println("RIPE database updated successfully.")
+    fmt.Printf("RIPE database updated successfully at %s\n", ripedbPath)
 }
 
 func gunzipFile(source, destination string) error {
