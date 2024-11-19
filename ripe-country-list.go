@@ -18,6 +18,7 @@ import (
 
 var (
     // Global variable storing the path to the RIPE database cache file
+	version = "dev"
     ripedbPath string
 )
 
@@ -45,6 +46,8 @@ func main() {
     case "-l":
         // Show available country codes
         showAvailableCountryCodes()
+	case "-v", "--version":
+		fmt.Printf("version: %s\n", version)
     case "-u":
         // Update the RIPE database
         updateRIPEdb()
@@ -84,6 +87,7 @@ func usage() {
     fmt.Println(`Usage: ripe-country-list <option>
 Options:
   -h, --help              Show this help message
+  -v, --version           Show the version of this application
   -u                      Update RIPE database
   -dns-acl COUNTRYCODE    Generate ACL list for DNS BIND based on country code
   -dns-acl-f COUNTRYCODE  Generate filtered ACL list for DNS BIND based on country code

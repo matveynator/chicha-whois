@@ -97,47 +97,44 @@ func main() {
 
 			outputPath := filepath.Join(outputDir, execFileName)
 
-			buildCmd := exec.Command("go", "build", "-o", outputPath, goSourceFile)
-			buildCmd.Env = append(os.Environ(),
-				"GOOS="+osName,
-				"GOARCH="+arch,
-			)
-
-			if err := buildCmd.Run(); err != nil {
-				// Remove the directory if build fails
-				err = os.RemoveAll(outputDir)
-				if err != nil {
-					log.Printf("Error removing output directory %s: %v", outputDir, err)
-				}
-				continue
-			} else {
-				err = os.Chmod(outputPath, 0755)
-				if err != nil {
-					log.Printf("Error setting permissions on %s: %v", outputPath, err)
-				}
-
-				fmt.Printf("Successfully built %s for %s/%s\n", execFileName, osName, arch)
+			ldflags := fmt.Sprintf("-X main.version=%s", version)
+			buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, goSourceFile)
+			buildCmd.Env = append(os.Environ(),"GOOS="+osName,"GOARCH="+arch,)
+		if err := buildCmd.Run(); err != nil {
+			// Remove the directory if build fails
+			err = os.RemoveAll(outputDir)
+			if err != nil {
+				log.Printf("Error removing output directory %s: %v", outputDir, err)
 			}
-		}
-	}
-
-	// Step 5: Optional deployment over SSH
-	fmt.Println("Do you want to deploy the binaries over SSH? (y/n)")
-	var response string
-	fmt.Scanln(&response)
-	if strings.ToLower(response) == "y" {
-		deployPath := "/home/files/public_html/" + execFileName  + "/"
-		remoteHost := "files@files.zabiyaka.net"
-
-		err = runCommand("rsync", "-avP", binariesPath+"/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
-		if err != nil {
-			log.Printf("Error deploying binaries: %v", err)
+			continue
 		} else {
-			fmt.Println("Deployment completed successfully.")
+			err = os.Chmod(outputPath, 0755)
+			if err != nil {
+				log.Printf("Error setting permissions on %s: %v", outputPath, err)
+			}
+
+			fmt.Printf("Successfully built %s for %s/%s\n", execFileName, osName, arch)
 		}
-	} else {
-		fmt.Println("Deployment skipped.")
 	}
+}
+
+// Step 5: Optional deployment over SSH
+fmt.Println("Do you want to deploy the binaries over SSH? (y/n)")
+var response string
+fmt.Scanln(&response)
+if strings.ToLower(response) == "y" {
+	deployPath := "/home/files/public_html/" + execFileName  + "/"
+	remoteHost := "files@files.zabiyaka.net"
+
+	err = runCommand("rsync", "-avP", binariesPath+"/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
+	if err != nil {
+		log.Printf("Error deploying binaries: %v", err)
+	} else {
+		fmt.Println("Deployment completed successfully.")
+	}
+} else {
+	fmt.Println("Deployment skipped.")
+}
 }
 
 // Helper function to run a command
