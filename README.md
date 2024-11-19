@@ -1,4 +1,4 @@
-# The Ripe Country List
+# The RIPE Country IP List for DNS BIND Access Lists.
 
 ### What It Does
 
