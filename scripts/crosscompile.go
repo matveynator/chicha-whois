@@ -14,7 +14,6 @@ import (
 func main() {
 
 	baseVersion := "1.0"
-	var execFileName string
 
 	// Step 1: Automatically find the main Go file
 	goSourceFile, err := findMainGoFile()
@@ -123,10 +122,10 @@ fmt.Println("Do you want to deploy the binaries over SSH? (y/n)")
 var response string
 fmt.Scanln(&response)
 if strings.ToLower(response) == "y" {
-	deployPath := "/home/files/public_html/" + execFileName  + "/"
+	deployPath := "/home/files/public_html/" + executionFile + "/"
 	remoteHost := "files@files.zabiyaka.net"
 
-	err = runCommand("rsync", "-avP", binariesPath+"/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
+	err = runCommand("rsync", "-avP", "binaries/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
 	if err != nil {
 		log.Printf("Error deploying binaries: %v", err)
 	} else {
