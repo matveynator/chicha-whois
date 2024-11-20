@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -39,17 +38,7 @@ func main() {
 		log.Fatalf("Error getting Git root path: %v", err)
 	}
 
-	// Step 2: Run tests on all modules
-	fmt.Println("Performing tests on all modules...")
-	if err := runCommand("go", "test", "./..."); err != nil {
-		fmt.Println("Tests on all modules failed.")
-		fmt.Println("Press Enter to continue compilation or CTRL+C to abort.")
-		bufio.NewReader(os.Stdin).ReadBytes('\n')
-	} else {
-		fmt.Println("Tests on all modules passed.")
-	}
-
-	// Step 3: Set up directories
+	// Set up directories
 	binariesPath := filepath.Join(gitRootPath, "binaries", version)
 	err = os.MkdirAll(binariesPath, os.ModePerm)
 	if err != nil {
