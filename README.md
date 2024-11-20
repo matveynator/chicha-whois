@@ -1,3 +1,5 @@
+<img src="https://repository-images.githubusercontent.com/890922366/c688698f-4bb2-4aad-a6ed-372983654b34" width="50%" align="right">
+
 # chicha-whois
 
 **chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done.
