@@ -1,84 +1,54 @@
-# Chicha-Whois
+# chicha-whois
 
-Chicha-Whois is a command-line tool designed to interact with the RIPE database. It helps system administrators manage IP ranges associated with specific countries by updating the database, generating ACLs for BIND DNS servers, and displaying available country codes.
+chicha-whois is a command-line tool to manage RIPE database and generate DNS ACLs.
 
-## Usage
 
-Run the `chicha-whois` command followed by an option:
+## Installation Linux AMD64 systems:
+For Linux AMD64 systems you can use the following command to download the chicha-whois binary, move it to /usr/local/bin, and make it executable:
 
 ```bash
-chicha-whois <option>
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois
 ```
 
-### Options
+Run `chicha-whois -h` to start.
 
-- `-h`, `--help`: Show the help message.
-- `-v`, `--version`: Display the application version.
+## Commands
+
 - `-u`: Update the RIPE database.
-- `-dns-acl COUNTRYCODE`: Generate an ACL list for BIND DNS based on the specified country code.
-- `-dns-acl-f COUNTRYCODE`: Generate a filtered ACL list for BIND DNS, optimizing by removing redundant subnets.
-- `-l`: Show available country codes.
+- `-dns-acl COUNTRYCODE`: Create a BIND ACL for a country (e.g., `RU`).
+- `-dns-acl-f COUNTRYCODE`: Create a filtered BIND ACL (removes redundant subnets).
+- `-l`: Show all country codes.
+- `-h`: Show help.
 
-### Examples
+## Examples
 
-#### Update the RIPE Database
+1. **Update the database:**
+   ```bash
+   chicha-whois -u
+   ```
+   Downloads and saves the RIPE database to `~/.ripe.db.cache/ripe.db.inetnum`.
 
-Before generating ACLs, update the RIPE database:
+2. **Generate a BIND ACL:**
+   ```bash
+   chicha-whois -dns-acl RU
+   ```
+   Creates `acl_RU.conf` in your home directory.
 
-```bash
-chicha-whois -u
-```
+3. **Generate a filtered BIND ACL:**
+   ```bash
+   chicha-whois -dns-acl-f RU
+   ```
 
-This command:
+4. **List available country codes:**
+   ```bash
+   chicha-whois -l
+   ```
 
-- Downloads the latest RIPE database.
-- Displays detailed progress during download and extraction.
-- Saves the updated database to `~/.ripe.db.cache/ripe.db.inetnum`.
+---
 
-#### Generate a BIND ACL for a Country
-
-To create an ACL file for a specific country (e.g., Russia):
-
-```bash
-chicha-whois -dns-acl RU
-```
-
-This command:
-
-- Checks for the RIPE database and prompts you to update if it's missing.
-- Parses the database to find all IP ranges associated with the country code `RU`.
-- Generates an ACL file named `acl_RU.conf` in your home directory.
-- The ACL file contains all the IP ranges in CIDR notation for use with BIND DNS.
-
-#### Generate a Filtered BIND ACL
-
-For an optimized ACL by filtering out redundant subnets:
-
-```bash
-chicha-whois -dns-acl-f RU
-```
-
-This command performs the same steps as `-dns-acl` but additionally filters out any subnets that are subsets of larger networks, resulting in a more efficient ACL file with fewer entries.
-
-#### List Available Country Codes
-
-To display all supported country codes and their corresponding country names:
-
-```bash
-chicha-whois -l
-```
-
-This command:
-
-- Prints a sorted list of country codes along with country names.
-- Helps you find the correct country code to use with other commands.
-
-## Notes
-
-- **RIPE Database Location**: The RIPE database is cached at `~/.ripe.db.cache/ripe.db.inetnum`.
-- **ACL File Location**: Generated ACL files are saved in your home directory (e.g., `~/acl_RU.conf`).
-- **Internet Connection**: Required to update the RIPE database.
-- **Permissions**: Ensure you have the necessary permissions to read/write in your home directory.
+### Notes
+- **Database location:** `~/.ripe.db.cache/ripe.db.inetnum`.
+- **ACL files saved to:** Your home directory.
 
 ### Downloads
 
