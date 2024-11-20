@@ -4,7 +4,6 @@
 
 **chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done.
 
----
 
 ## Downloads
 
