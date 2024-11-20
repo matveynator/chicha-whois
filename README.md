@@ -1,63 +1,75 @@
 # chicha-whois
 
-chicha-whois is a command-line tool to manage RIPE database and generate DNS ACLs.
+**chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done.
 
+---
 
-## Installation Linux AMD64 systems:
-For Linux AMD64 systems you can use the following command to download the chicha-whois binary, move it to /usr/local/bin, and make it executable:
+## Downloads
+
+Pick your binary and get started:
+
+- [Linux AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois)  
+- [Windows AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/windows/amd64/chicha-whois.exe)  
+- [macOS AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois)  
+- [Linux ARM64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/arm64/chicha-whois)  
+
+Need something else? [Check all binaries](https://files.zabiyaka.net/chicha-whois/latest/no-gui/).
+
+---
+
+## Installation
+
+On Linux AMD64, install in one line:  
 
 ```bash
 sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois
 ```
 
-Run `chicha-whois -h` to start.
+Done? Try it:  
+```bash
+chicha-whois -h
+```
+
+---
 
 ## Commands
 
 - `-u`: Update the RIPE database.
-- `-dns-acl COUNTRYCODE`: Create a BIND ACL for a country (e.g., `RU`).
-- `-dns-acl-f COUNTRYCODE`: Create a filtered BIND ACL (removes redundant subnets).
-- `-l`: Show all country codes.
+- `-dns-acl COUNTRYCODE`: Generate a BIND ACL (e.g., `RU`).
+- `-dns-acl-f COUNTRYCODE`: Create a filtered ACL (no redundant subnets).
+- `-l`: Show available country codes.
 - `-h`: Show help.
+
+---
 
 ## Examples
 
-1. **Update the database:**
+1. **Update the RIPE database**  
    ```bash
    chicha-whois -u
    ```
-   Downloads and saves the RIPE database to `~/.ripe.db.cache/ripe.db.inetnum`.
+   This downloads and updates the database locally.
 
-2. **Generate a BIND ACL:**
+2. **Create an ACL for Russia**  
    ```bash
    chicha-whois -dns-acl RU
    ```
-   Creates `acl_RU.conf` in your home directory.
+   Outputs `acl_RU.conf` with all Russian IP ranges.
 
-3. **Generate a filtered BIND ACL:**
+3. **Optimized ACL**  
    ```bash
    chicha-whois -dns-acl-f RU
    ```
+   Same as above, but smarter—filters out redundant subnets.
 
-4. **List available country codes:**
+4. **List all country codes**  
    ```bash
    chicha-whois -l
    ```
 
 ---
 
-### Notes
-- **Database location:** `~/.ripe.db.cache/ripe.db.inetnum`.
-- **ACL files saved to:** Your home directory.
+## Notes
 
-### Downloads
-
-Pick your system and let the program do its magic.
-
-- **Linux AMD64**: [Download](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois)
-- **Windows AMD64**: [Download](https://files.zabiyaka.net/chicha-whois/latest/no-gui/windows/amd64/chicha-whois.exe)
-- **macOS AMD64**: [Download](https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois)
-- **Linux ARM64**: [Download](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/arm64/chicha-whois)
-
-For other systems, explore [all binaries](https://files.zabiyaka.net/chicha-whois/latest/no-gui/).
-
+- **Database saved to**: `~/.ripe.db.cache/ripe.db.inetnum`.  
+- **ACL files saved to**: Your home directory (e.g., `~/acl_RU.conf`).  
