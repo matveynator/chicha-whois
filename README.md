@@ -1,8 +1,8 @@
-<img src="https://repository-images.githubusercontent.com/890922366/c688698f-4bb2-4aad-a6ed-372983654b34" width="70%" align="right">
+<img src="https://raw.githubusercontent.com/matveynator/chicha-whois/refs/heads/master/chicha-whois-logo.png" alt="chicha-whois" width="50%" align="right" />
 
-# chicha-whois
 
 **chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done. Written in Golang.
+
 
 
 ## Downloads
@@ -74,3 +74,60 @@ chicha-whois -h
 
 - **Database saved to**: `~/.ripe.db.cache/ripe.db.inetnum`.  
 - **ACL files saved to**: Your home directory (e.g., `~/acl_RU.conf`).  
+
+
+## BIND9 Configuration for RU and UA Clients
+Copy and paste the following configuration into your BIND9 named.conf:
+
+```
+include "/etc/bind/acl_RU.conf";
+include "/etc/bind/acl_UA.conf";
+
+view "RU" {
+    match-clients { RU; };  # RU clients
+    zone "domain.com" {
+        type master;
+        file "/etc/bind/zones/db.domain.com.RU";
+    };
+};
+
+view "UA" {
+    match-clients { UA; };  # UA clients
+    zone "domain.com" {
+        type master;
+        file "/etc/bind/zones/db.domain.com.UA";
+    };
+};
+
+view "default" {
+    match-clients { any; };  # All other clients
+    zone "domain.com" {
+        type master;
+        file "/etc/bind/zones/db.domain.com.default";
+    };
+};
+```
+
+Save ACLs to /etc/bind/acl_RU.conf and /etc/bind/acl_UA.conf.
+
+### Create zone files:
+
+```
+/etc/bind/zones/db.domain.com.RU
+/etc/bind/zones/db.domain.com.UA
+/etc/bind/zones/db.domain.com.default
+```
+
+### Verify configuration:
+
+```
+sudo named-checkconf
+sudo named-checkzone domain.com /etc/bind/zones/db.domain.com.ru
+```
+
+### Restart BIND:
+```
+sudo systemctl restart bind9
+```
+Done!
+
