@@ -83,7 +83,7 @@ Copy and paste the following configuration into your BIND9 named.conf:
 include "/etc/bind/acl_RU.conf";
 include "/etc/bind/acl_UA.conf";
 
-view "RU" {
+view "Russia" {
     match-clients { RU; };  # RU clients
     zone "domain.com" {
         type master;
@@ -91,7 +91,7 @@ view "RU" {
     };
 };
 
-view "UA" {
+view "Ukraine" {
     match-clients { UA; };  # UA clients
     zone "domain.com" {
         type master;
