@@ -12,8 +12,6 @@ import (
 
 func main() {
 
-	baseVersion := "1.0"
-
 	// Step 1: Automatically find the main Go file
 	goSourceFile, err := findMainGoFile()
 	if err != nil {
@@ -24,12 +22,12 @@ func main() {
 	baseName := filepath.Base(goSourceFile)
 	executionFile := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 
-	// Get the current Git version and prepend baseVersion
+	// Get the current Git version
 	gitVersion, err := getGitVersion()
 	if err != nil {
 		log.Fatalf("Error getting Git version: %v", err)
 	}
-	version := baseVersion + "-" + gitVersion
+	version := gitVersion
 	fmt.Printf("Building version: %s\n", version)
 
 	// Get the root path of the Git repository
@@ -56,14 +54,15 @@ func main() {
 	osList := []string{
 		"android", "aix", "darwin", "dragonfly", "freebsd",
 		"illumos", "ios", "js", "linux", "netbsd",
-		"openbsd", "plan9", "solaris", "windows", "zos",
+		"openbsd", "plan9", "solaris", "windows", "wasip1", "zos",
 	}
 
 	archList := []string{
-		"amd64", "386", "arm", "arm64", "mips64",
+		"amd64", "386", "arm", "arm64", "loong64", "mips64",
 		"mips64le", "mips", "mipsle", "ppc64",
 		"ppc64le", "riscv64", "s390x", "wasm",
 	}
+
 
 	for _, osName := range osList {
 		for _, arch := range archList {
@@ -106,13 +105,30 @@ func main() {
 		}
 	}
 
+	// Default deployment settings
+	deployPath := "/home/files/public_html/" + executionFile + "/"
+	remoteHost := "files@files.zabiyaka.net"
+
 	// Step 5: Optional deployment over SSH
 	fmt.Println("Do you want to deploy the binaries over SSH? (y/n)")
 	var response string
 	fmt.Scanln(&response)
 	if strings.ToLower(response) == "y" {
-		deployPath := "/home/files/public_html/" + executionFile + "/"
-		remoteHost := "files@files.zabiyaka.net"
+		// Optionally change deployPath
+		fmt.Printf("Default deployment path is '%s'. Do you want to change it? (y/n): ", deployPath)
+		fmt.Scanln(&response)
+		if strings.ToLower(response) == "y" {
+			fmt.Print("Enter new deployment path: ")
+			fmt.Scanln(&deployPath)
+		}
+
+		// Optionally change remoteHost
+		fmt.Printf("Default remote host is '%s'. Do you want to change it? (y/n): ", remoteHost)
+		fmt.Scanln(&response)
+		if strings.ToLower(response) == "y" {
+			fmt.Print("Enter new remote host: ")
+			fmt.Scanln(&remoteHost)
+		}
 
 		err = runCommand("rsync", "-avP", "binaries/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
 		if err != nil {
@@ -184,3 +200,4 @@ func findMainGoFile() (string, error) {
 	}
 	return "", fmt.Errorf("No main Go file found in the current directory")
 }
+
