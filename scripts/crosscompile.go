@@ -110,24 +110,28 @@ func main() {
 	remoteHost := "files@files.zabiyaka.net"
 
 	// Step 5: Optional deployment over SSH
-	fmt.Println("Do you want to deploy the binaries over SSH? (y/n)")
+	fmt.Print("Do you want to deploy the binaries over SSH? (Y/n): ")
 	var response string
 	fmt.Scanln(&response)
-	if strings.ToLower(response) == "y" {
-		// Optionally change deployPath
-		fmt.Printf("Default deployment path is '%s'. Do you want to change it? (y/n): ", deployPath)
-		fmt.Scanln(&response)
-		if strings.ToLower(response) == "y" {
-			fmt.Print("Enter new deployment path: ")
-			fmt.Scanln(&deployPath)
-		}
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response == "n" {
+		fmt.Println("Deployment skipped.")
+	} else {
+
+		var input string
 
 		// Optionally change remoteHost
-		fmt.Printf("Default remote host is '%s'. Do you want to change it? (y/n): ", remoteHost)
-		fmt.Scanln(&response)
-		if strings.ToLower(response) == "y" {
-			fmt.Print("Enter new remote host: ")
-			fmt.Scanln(&remoteHost)
+		fmt.Printf("Default remote host is '%s'. Press Enter to keep it or type a new host: ", remoteHost)
+		fmt.Scanln(&input)
+		if input != "" {
+			remoteHost = input
+		}
+
+		// Optionally change deployPath
+		fmt.Printf("Default deployment path is '%s'. Press Enter to keep it or type a new path: ", deployPath)
+		fmt.Scanln(&input)
+		if input != "" {
+			deployPath = input
 		}
 
 		err = runCommand("rsync", "-avP", "binaries/", fmt.Sprintf("%s:%s", remoteHost, deployPath))
@@ -136,9 +140,8 @@ func main() {
 		} else {
 			fmt.Println("Deployment completed successfully.")
 		}
-	} else {
-		fmt.Println("Deployment skipped.")
 	}
+
 }
 
 // Helper function to run a command
