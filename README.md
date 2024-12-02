@@ -23,7 +23,7 @@ Need something else? [Check all binaries](https://files.zabiyaka.net/chicha-whoi
 On Linux AMD64, install in one line:  
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
 ```
 
 Done? Try it:  
