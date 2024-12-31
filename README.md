@@ -25,25 +25,19 @@
 ### Linux (AMD64)
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && \
-sudo chmod +x /usr/local/bin/chicha-whois && \
-/usr/local/bin/chicha-whois --version
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois; sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version
 ```
 
 ### macOS (Intel)
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois -o /usr/local/bin/chicha-whois && \
-sudo chmod +x /usr/local/bin/chicha-whois && \
-/usr/local/bin/chicha-whois --version
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois -o /usr/local/bin/chicha-whois; sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version
 ```
 
 ### macOS (Apple Silicon, ARM64)
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/arm64/chicha-whois -o /usr/local/bin/chicha-whois && \
-sudo chmod +x /usr/local/bin/chicha-whois && \
-/usr/local/bin/chicha-whois --version
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/arm64/chicha-whois -o /usr/local/bin/chicha-whois; sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version
 ```
 
 Проверить установку:
@@ -67,7 +61,7 @@ chicha-whois -h
 | `-l`                                          | Показать список доступных кодов стран (упорядоченный по названию).                                                                                                                                                                 |
 | `-h` или `--help`                             | Вывести справку и краткую информацию об опциях.                                                                                                                                                                                    |
 | `-v` или `--version`                          | Показать версию приложения.                                                                                                                                                                                                         |
-| **`-search [-dns | -ovpn | -ovpn-push] CC:kw1,kw2...`** | **Расширенный поиск.** Позволяет искать по коду страны (опционально) **и/или** по ключевым словам (`kw1`, `kw2` и т.д.). *Всегда* фильтрует вложенные подсети и **выводит** результат прямо в консоль (не в файл) в одном из форматов: DNS/OVPN/OVPN (push). |
+| -search [-dns -ovpn -ovpn-push] CC:kw1,kw2 | **Расширенный поиск.** Позволяет искать по коду страны (опционально) **и/или** по ключевым словам (`kw1`, `kw2` и т.д.). *Всегда* фильтрует вложенные подсети и **выводит** результат прямо в консоль (не в файл) в одном из форматов: DNS/OVPN/OVPN (push). |
 
 ### О команде `-search`
 
