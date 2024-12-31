@@ -28,13 +28,13 @@ sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/c
 On MacOSX Intel:  
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/macos/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
 ```
 
 On MacOSX Silicon:  
 
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/macos/arm64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/arm64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
 ```
 
 Done? Try it:  
