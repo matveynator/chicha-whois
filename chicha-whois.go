@@ -16,394 +16,483 @@ import (
 	"strings"
 )
 
+// version    - holds the current application version, set to "dev" by default.
+// ripedbPath - stores the file path for the RIPE DB cache (will be constructed at runtime).
 var (
-	// Global variable storing the path to the RIPE database cache file
 	version    = "dev"
 	ripedbPath string
 )
 
-// ProgressReader is a wrapper around an io.Reader that tracks the number of bytes read and displays progress.
+// ProgressReader is a wrapper around an io.Reader that displays progress while reading bytes.
 type ProgressReader struct {
-	Reader    io.Reader // The underlying reader we're wrapping (e.g., response body).
-	Total     int64     // Total size of the data to be read (for progress calculation).
-	Progress  int64     // Amount of data read so far.
-	Operation string    // Description of the operation (e.g., "Downloading").
+	Reader    io.Reader // The underlying reader (e.g., response body from HTTP).
+	Total     int64     // The total size of the data, used for calculating percentage progress.
+	Progress  int64     // The number of bytes read so far.
+	Operation string    // A short description of the current operation (e.g., "Downloading").
 }
 
-// Read reads data from the underlying reader and updates the progress.
+// Read implements the io.Reader interface, updating Progress and printing progress info.
 func (pr *ProgressReader) Read(p []byte) (int, error) {
-	// Read data into p from the underlying reader.
+	// Read from the underlying reader into the provided byte slice p.
 	n, err := pr.Reader.Read(p)
-	// Update the total number of bytes read so far.
+	// Increment the Progress field by the number of bytes read.
 	pr.Progress += int64(n)
-	// If total size is known, calculate and display the progress percentage.
+
+	// If the total size is known, display percentage; otherwise just show bytes read.
 	if pr.Total > 0 {
 		percent := float64(pr.Progress) / float64(pr.Total) * 100
 		fmt.Printf("\r%s... %.2f%%", pr.Operation, percent)
 	} else {
-		// If total size is unknown, display bytes read.
 		fmt.Printf("\r%s... %d bytes", pr.Operation, pr.Progress)
 	}
 	return n, err
 }
 
 func main() {
-	// Retrieve the user's home directory
+	// Attempt to get the current user's home directory. If this fails, abort.
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error getting home directory:", err)
 		return
 	}
-	// Construct the path to the RIPE database cache
+
+	// Construct the default path to the cached RIPE DB file:
+	// For example, "~/.ripe.db.cache/ripe.db.inetnum"
 	ripedbPath = filepath.Join(homeDir, ".ripe.db.cache/ripe.db.inetnum")
 
-	// Ensure there is a command-line argument to process
+	// Check if at least 2 arguments exist (the binary name is the first arg).
 	if len(os.Args) < 2 {
 		usage()
 		return
 	}
 
-	// Handle the specified command
+	// The first actual argument is the command (e.g., "-u", "-dns-acl", etc.).
 	cmd := os.Args[1]
+
+	// We use a switch statement to handle each supported command.
 	switch cmd {
 	case "-h", "--help":
+		// Print usage information.
 		usage()
+
 	case "-l":
-		// Show available country codes
+		// Show a list of known country codes and their full names.
 		showAvailableCountryCodes()
+
 	case "-v", "--version":
+		// Print the current application version string.
 		fmt.Printf("version: %s\n", version)
+
 	case "-u":
-		// Update the RIPE database
+		// Update (download and extract) the RIPE database to the local cache.
 		updateRIPEdb()
+
 	case "-dns-acl":
-		// Generate ACL list for BIND based on the provided country code
+		// Generate an unfiltered BIND ACL file for the specified country code.
 		if len(os.Args) > 2 {
 			countryCode := os.Args[2]
-			// Ensure the RIPE database cache exists; update if missing
-			if _, err := os.Stat(ripedbPath); os.IsNotExist(err) {
-				fmt.Println("RIPE database cache not found. Updating...")
-				updateRIPEdb()
-			}
-			createBindACL(countryCode)
+			ensureRIPEdb()             // Make sure the RIPE DB file is present.
+			createBindACL(countryCode) // Create BIND ACL.
 		} else {
 			usage()
 		}
+
 	case "-dns-acl-f":
-		// Generate ACL list for BIND with filtering of redundant subnets
+		// Generate a filtered BIND ACL file (remove nested subnets).
 		if len(os.Args) > 2 {
 			countryCode := os.Args[2]
-			// Ensure the RIPE database cache exists; update if missing
-			if _, err := os.Stat(ripedbPath); os.IsNotExist(err) {
-				fmt.Println("RIPE database cache not found. Updating...")
-				updateRIPEdb()
-			}
+			ensureRIPEdb()
 			createBindACLFiltered(countryCode)
 		} else {
 			usage()
 		}
+
+	case "-ovpn":
+		// Generate an unfiltered OpenVPN exclude-route file for the given country.
+		if len(os.Args) > 2 {
+			countryCode := os.Args[2]
+			ensureRIPEdb()
+			createOpenVPNExclude(countryCode)
+		} else {
+			usage()
+		}
+
+	case "-ovpn-f":
+		// Generate a filtered OpenVPN exclude-route file for the given country.
+		if len(os.Args) > 2 {
+			countryCode := os.Args[2]
+			ensureRIPEdb()
+			createOpenVPNExcludeFiltered(countryCode)
+		} else {
+			usage()
+		}
+
 	default:
-		// Show usage for unknown commands
+		// If an unknown command is supplied, print usage again.
 		usage()
 	}
 }
 
+// usage prints a help message describing each command-line option.
 func usage() {
 	fmt.Println(`Usage: chicha-whois <option>
 Options:
-  -h, --help              Show this help message
-  -v, --version           Show the version of this application
-  -u                      Update RIPE database
-  -dns-acl COUNTRYCODE    Generate ACL list for DNS BIND based on country code
-  -dns-acl-f COUNTRYCODE  Generate filtered ACL list for DNS BIND based on country code
-  -l                      Show available country codes`)
-}
-func updateRIPEdb() {
-	// Updates the RIPE database cache with detailed progress display during download and extraction.
+  -h, --help               Show this help message
+  -v, --version            Show the version of this application
+  -u                       Update RIPE NCC database. RIPE NCC manages Internet resources for Europe, the Middle East, Central Asia, the Caucasus region, and parts of Russia.
+  -l                       Show available country codes
 
-	// Define the URL to download the RIPE database from.
+  # Generate DNS Bind ACL (unfiltered / filtered)
+  -dns-acl COUNTRYCODE     Generate ACL list for DNS BIND based on country code
+  -dns-acl-f COUNTRYCODE   Generate filtered ACL list for DNS BIND based on country code
+
+  # Generate OpenVPN exclude-route list (unfiltered / filtered)
+  -ovpn COUNTRYCODE        Generate unfiltered exclude-route list for OpenVPN
+  -ovpn-f COUNTRYCODE      Generate filtered exclude-route list for OpenVPN`)
+}
+
+// ensureRIPEdb checks if the cached RIPE DB file exists, and if not, calls updateRIPEdb().
+func ensureRIPEdb() {
+	if _, err := os.Stat(ripedbPath); os.IsNotExist(err) {
+		fmt.Println("RIPE database cache not found. Updating...")
+		updateRIPEdb()
+	}
+}
+
+// updateRIPEdb downloads the RIPE database from a publicly available URL and extracts it.
+func updateRIPEdb() {
+	// This is the location to download the gzipped RIPE database file.
 	downloadURL := "https://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz"
 
-	// Retrieve the user's home directory to store temporary and output files.
+	// Get the current user's home directory to store temporary files.
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error getting home directory:", err)
 		return
 	}
 
-	// Create a temporary file in the home directory for storing the downloaded RIPE database.
+	// Create a temporary file in the home directory for the compressed DB.
 	tmpFile, err := os.CreateTemp(homeDir, "ripe.db.inetnum-*.gz")
 	if err != nil {
 		fmt.Println("Error creating temporary file:", err)
 		return
 	}
-	// Ensure the temporary file is closed and deleted after we're done.
 	defer func() {
-		err := os.Remove(tmpFile.Name())
-		if err != nil {
-			fmt.Println("Warning: failed to remove temporary file:", tmpFile.Name())
-		} else {
-			fmt.Println("Temporary file removed:", tmpFile.Name())
-		}
+		// Remove the temporary file once we are done.
+		_ = os.Remove(tmpFile.Name())
+		fmt.Println("Temporary file removed:", tmpFile.Name())
 	}()
 	defer tmpFile.Close()
 
-	// Inform the user about the download initiation.
 	fmt.Printf("Starting download of RIPE database from %s\n", downloadURL)
 	fmt.Printf("Saving to temporary file: %s\n", tmpFile.Name())
 
-	// Initiate the HTTP GET request to download the RIPE database.
+	// Perform an HTTP GET request to fetch the RIPE DB.
 	resp, err := http.Get(downloadURL)
 	if err != nil {
-		fmt.Printf("Error downloading RIPE database from %s: %v\n", downloadURL, err)
+		fmt.Printf("Error downloading RIPE database: %v\n", err)
 		return
 	}
-	// Ensure the response body is closed after reading.
 	defer resp.Body.Close()
 
-	// Get the total size of the file from the Content-Length header for progress calculation.
+	// Retrieve the total size from the Content-Length header (may be -1 if unknown).
 	totalSize := resp.ContentLength
 	if totalSize <= 0 {
-		fmt.Println("Unable to determine file size for progress display")
+		fmt.Println("Unable to determine file size for progress display.")
 	} else {
 		fmt.Printf("Total file size: %d bytes\n", totalSize)
 	}
 
-	// Create a progress reader to wrap the response body and track the download progress.
+	// Wrap the response body with a ProgressReader to print download progress.
 	progressReader := &ProgressReader{
-		Reader:    resp.Body,     // The underlying reader (response body).
-		Total:     totalSize,     // Total size of the file for progress calculation.
-		Operation: "Downloading", // Operation description for progress display.
+		Reader:    resp.Body,
+		Total:     totalSize,
+		Operation: "Downloading",
 	}
 
-	// Copy the response body to the temporary file, reading through the progress reader.
+	// Copy the downloaded bytes from progressReader to tmpFile.
 	_, err = io.Copy(tmpFile, progressReader)
 	if err != nil {
 		fmt.Println("Error writing to temporary file:", err)
 		return
 	}
-	fmt.Println() // Move to the next line after progress display.
+	fmt.Println() // Print a newline after final progress percentage.
 
-	// Inform the user about the extraction initiation.
 	fmt.Printf("Extracting %s to %s\n", tmpFile.Name(), ripedbPath)
-
-	// Decompress the Gzip file and save it to the final path, with progress display.
+	// Decompress the .gz file into our final ripedbPath.
 	err = gunzipFileWithProgress(tmpFile.Name(), ripedbPath)
 	if err != nil {
 		fmt.Println("Error decompressing RIPE database:", err)
 		return
 	}
 
-	// Inform the user that the RIPE database has been updated successfully.
 	fmt.Printf("RIPE database updated successfully at %s\n", ripedbPath)
 }
 
+// gunzipFileWithProgress decompresses a .gz file and writes the output to destination.
 func gunzipFileWithProgress(source, destination string) error {
-	// Decompresses a Gzip file and saves it to the destination with progress display during extraction
-
-	// Get the size of the compressed file (source)
+	// First, get the size of the .gz file to track extraction progress.
 	fi, err := os.Stat(source)
 	if err != nil {
 		return err
 	}
 	compressedSize := fi.Size()
 
-	// Create the destination directory if it doesn't exist
-	dir := filepath.Dir(destination) // Extract directory path
-	err = os.MkdirAll(dir, os.ModePerm)
-	if err != nil {
+	// Ensure the destination directory exists; create if needed.
+	dir := filepath.Dir(destination)
+	if err = os.MkdirAll(dir, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directory %s: %v", dir, err)
 	}
 
-	// Open the compressed source file
+	// Open the compressed source file for reading.
 	file, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Create a progress reader to wrap the source file and track the decompression progress
+	// Wrap it in a ProgressReader to show extraction progress.
 	progressReader := &ProgressReader{
-		Reader: file,           // The underlying reader (compressed file)
-		Total:  compressedSize, // Total size of the compressed file
+		Reader: file,
+		Total:  compressedSize,
 	}
 
-	// Create a Gzip reader using the progress reader
+	// Create a new gzip reader on top of progressReader.
 	gz, err := gzip.NewReader(progressReader)
 	if err != nil {
 		return err
 	}
 	defer gz.Close()
 
-	// Open the destination file for writing the decompressed data
+	// Create the destination file for the uncompressed data.
 	out, err := os.Create(destination)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	// Copy the decompressed data from the Gzip reader to the destination file
+	// Copy from gz to out, thus decompressing the data.
 	_, err = io.Copy(out, gz)
 	if err != nil {
 		return err
 	}
-	fmt.Println("\nDecompression completed.") // Indicate that decompression is complete
+	fmt.Println("\nDecompression completed.")
 	return nil
 }
 
+// createBindACL extracts all CIDRs for a country (unfiltered) and writes them as a BIND ACL.
 func createBindACL(countryCode string) {
-	// Generates a BIND ACL for the specified country code using data from the RIPE database.
 	fmt.Printf("Creating BIND ACL for country code: %s\n", countryCode)
 
-	// Open the RIPE database file.
-	file, err := os.Open(ripedbPath)
-	if err != nil {
-		fmt.Println("Error opening RIPE database:", err)
-		return
-	}
-	defer file.Close()
-
-	// Prepare to read the file block by block.
-	scanner := bufio.NewScanner(file)
-	var ipRanges []string
-	countryCode = strings.ToUpper(countryCode) // Ensure country code is in uppercase for comparison.
-
-	// Variables to hold block data.
-	var blockLines []string
-
-	for {
-		blockLines = nil // Reset the block lines for each new block.
-
-		// Read a block of lines until an empty line is encountered.
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				// Empty line indicates the end of a block.
-				break
-			}
-			blockLines = append(blockLines, line)
-		}
-
-		// If no lines were read, we've reached the end of the file.
-		if len(blockLines) == 0 {
-			break
-		}
-
-		// Initialize variables to store inetnum and country data from the block.
-		var inetnumLine, countryLine string
-
-		// Process each line in the block to find inetnum and country information.
-		for _, line := range blockLines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "inetnum:") {
-				inetnumLine = line
-			} else if strings.HasPrefix(line, "country:") {
-				countryLine = line
-			}
-		}
-
-		// If both inetnum and country data are found, proceed to process the block.
-		if inetnumLine != "" && countryLine != "" {
-			// Extract the country code from the country line.
-			fields := strings.Fields(countryLine)
-			if len(fields) >= 2 {
-				blockCountryCode := strings.ToUpper(fields[1])
-				if blockCountryCode == countryCode {
-					// Extract the IP range from the inetnum line.
-					inetnumFields := strings.Fields(inetnumLine)
-					if len(inetnumFields) >= 2 {
-						ipRangeStr := strings.Join(inetnumFields[1:], " ")
-						// The IP range string is expected to be in the format "startIP - endIP".
-						ipRangeParts := strings.Split(ipRangeStr, "-")
-						if len(ipRangeParts) == 2 {
-							ipRangeStart := strings.TrimSpace(ipRangeParts[0])
-							ipRangeEnd := strings.TrimSpace(ipRangeParts[1])
-
-							// Log the found inetnum entry.
-							fmt.Printf("Found inetnum entry: %s - %s\n", ipRangeStart, ipRangeEnd)
-
-							// Generate a single CIDR block from the IP range.
-							cidr := generateCIDR(ipRangeStart, ipRangeEnd)
-
-							if cidr != "" {
-								fmt.Printf("Converted to CIDR: %s\n", cidr)
-								// Add the generated CIDR to the collection of IP ranges.
-								ipRanges = append(ipRanges, cidr)
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Continue to the next block.
-	}
-
-	// Check if any IP ranges were found.
+	// Extract all CIDRs from the RIPE DB for this country.
+	ipRanges := extractCountryCIDRs(countryCode, ripedbPath, false)
 	if len(ipRanges) == 0 {
 		fmt.Printf("No IP ranges found for country code: %s\n", countryCode)
 		return
 	}
 
-	// Remove duplicate CIDR entries.
+	// Remove duplicates and sort the final list.
 	ipRanges = removeDuplicates(ipRanges)
-
-	// Sort the IP ranges.
 	sort.Strings(ipRanges)
 
-	// Get the user's home directory to save the file locally.
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Error getting home directory:", err)
-		return
-	}
-	// Create the ACL file path in the user's local directory.
+	// Build the text for the BIND ACL. Each CIDR ends with a semicolon in BIND syntax.
+	homeDir, _ := os.UserHomeDir()
 	aclFilePath := filepath.Join(homeDir, fmt.Sprintf("acl_%s.conf", countryCode))
 
-	// Create the ACL file for BIND.
 	var entries []string
 	for _, cidr := range ipRanges {
-		entries = append(entries, fmt.Sprintf("  %s;", cidr)) // Format each CIDR as a BIND ACL entry.
+		entries = append(entries, fmt.Sprintf("  %s;", cidr))
 	}
 	aclContent := fmt.Sprintf("acl \"%s\" {\n%s\n};\n", countryCode, strings.Join(entries, "\n"))
 
-	// Write the ACL content to the specified file.
-	err = os.WriteFile(aclFilePath, []byte(aclContent), 0644)
-	if err != nil {
+	// Write the ACL string to a file in the user's home directory.
+	if err := os.WriteFile(aclFilePath, []byte(aclContent), 0644); err != nil {
 		fmt.Printf("Error writing BIND ACL file: %v\n", err)
 		return
 	}
 	fmt.Printf("BIND ACL file created at: %s\n", aclFilePath)
 }
 
+// createBindACLFiltered extracts all CIDRs for a country, filters out nested subnets, and writes them as a BIND ACL.
 func createBindACLFiltered(countryCode string) {
-	// Generates a BIND ACL for the specified country code, filtering out redundant subnets.
 	fmt.Printf("Creating BIND ACL with filtering for country code: %s\n", countryCode)
 
-	// Open the RIPE database file.
-	file, err := os.Open(ripedbPath)
+	// Extract all CIDRs from the RIPE DB.
+	ipRanges := extractCountryCIDRs(countryCode, ripedbPath, false)
+	if len(ipRanges) == 0 {
+		fmt.Printf("No IP ranges found for country code: %s\n", countryCode)
+		return
+	}
+
+	// Remove duplicates, then filter out subnets that are contained in larger blocks.
+	ipRanges = removeDuplicates(ipRanges)
+	ipRanges = filterRedundantCIDRs(ipRanges)
+	sort.Strings(ipRanges)
+
+	// Construct the BIND ACL content.
+	homeDir, _ := os.UserHomeDir()
+	aclFilePath := filepath.Join(homeDir, fmt.Sprintf("acl_%s.conf", countryCode))
+
+	var entries []string
+	for _, cidr := range ipRanges {
+		entries = append(entries, fmt.Sprintf("  %s;", cidr))
+	}
+	aclContent := fmt.Sprintf("acl \"%s\" {\n%s\n};\n", countryCode, strings.Join(entries, "\n"))
+
+	// Save the ACL to file.
+	if err := os.WriteFile(aclFilePath, []byte(aclContent), 0644); err != nil {
+		fmt.Printf("Error writing BIND ACL file: %v\n", err)
+		return
+	}
+	fmt.Printf("Filtered BIND ACL file created at: %s\n", aclFilePath)
+}
+
+// createOpenVPNExclude generates an unfiltered list of OpenVPN 'route' lines to exclude a country's IP ranges.
+func createOpenVPNExclude(countryCode string) {
+	fmt.Printf("Creating OpenVPN exclude-route list for country code: %s\n", countryCode)
+
+	// Get unfiltered CIDRs for this country from the RIPE DB.
+	ipRanges := extractCountryCIDRs(countryCode, ripedbPath, false)
+	if len(ipRanges) == 0 {
+		fmt.Printf("No IP ranges found for country code: %s\n", countryCode)
+		return
+	}
+
+	// Remove duplicates and sort them for neatness.
+	ipRanges = removeDuplicates(ipRanges)
+	sort.Strings(ipRanges)
+
+	// We assemble lines for an OpenVPN config.
+	// The user wants all traffic to go through VPN, but we add routes to exclude certain subnets.
+	var routeLines []string
+
+	routeLines = append(routeLines,
+		"# Redirect all traffic through VPN",
+		"redirect-gateway def1",
+		"",
+		fmt.Sprintf("# Exclude %s IPs from VPN", strings.ToUpper(countryCode)),
+	)
+
+	// Convert each CIDR to "route <ip> <mask> net_gateway" lines.
+	for _, cidr := range ipRanges {
+		startIP, netmask, err := cidrToRoute(cidr)
+		if err != nil {
+			fmt.Printf("Skipping CIDR (%s): %v\n", cidr, err)
+			continue
+		}
+		line := fmt.Sprintf("route %s %s net_gateway", startIP, netmask)
+		routeLines = append(routeLines, line)
+	}
+
+	// Write them to a .txt file under the user's home directory.
+	homeDir, _ := os.UserHomeDir()
+	outFilePath := filepath.Join(homeDir, fmt.Sprintf("openvpn_exclude_%s.txt", strings.ToUpper(countryCode)))
+
+	content := strings.Join(routeLines, "\n") + "\n"
+	if err := os.WriteFile(outFilePath, []byte(content), 0644); err != nil {
+		fmt.Printf("Error writing OpenVPN exclude file: %v\n", err)
+		return
+	}
+	fmt.Printf("OpenVPN exclude-route file created at: %s\n", outFilePath)
+}
+
+// createOpenVPNExcludeFiltered generates a filtered list of OpenVPN 'route' lines to exclude a country's IP ranges.
+func createOpenVPNExcludeFiltered(countryCode string) {
+	fmt.Printf("Creating FILTERED OpenVPN exclude-route list for country code: %s\n", countryCode)
+
+	// Get all country CIDRs from the RIPE DB.
+	ipRanges := extractCountryCIDRs(countryCode, ripedbPath, false)
+	if len(ipRanges) == 0 {
+		fmt.Printf("No IP ranges found for country code: %s\n", countryCode)
+		return
+	}
+
+	// Remove duplicates, filter out contained subnets, and sort.
+	ipRanges = removeDuplicates(ipRanges)
+	ipRanges = filterRedundantCIDRs(ipRanges)
+	sort.Strings(ipRanges)
+
+	// Build the route lines with some commentary.
+	var routeLines []string
+	routeLines = append(routeLines,
+		"# Redirect all traffic through VPN",
+		"redirect-gateway def1",
+		"",
+		fmt.Sprintf("# Exclude %s IPs from VPN (FILTERED)", strings.ToUpper(countryCode)),
+	)
+
+	// Convert each CIDR to "route <ip> <mask> net_gateway".
+	for _, cidr := range ipRanges {
+		startIP, netmask, err := cidrToRoute(cidr)
+		if err != nil {
+			fmt.Printf("Skipping CIDR (%s): %v\n", cidr, err)
+			continue
+		}
+		line := fmt.Sprintf("route %s %s net_gateway", startIP, netmask)
+		routeLines = append(routeLines, line)
+	}
+
+	// Save to the same naming pattern as the unfiltered version, but it's still "openvpn_exclude_<COUNTRY>.txt".
+	homeDir, _ := os.UserHomeDir()
+	outFilePath := filepath.Join(homeDir, fmt.Sprintf("openvpn_exclude_%s.txt", strings.ToUpper(countryCode)))
+
+	content := strings.Join(routeLines, "\n") + "\n"
+	if err := os.WriteFile(outFilePath, []byte(content), 0644); err != nil {
+		fmt.Printf("Error writing OpenVPN exclude file: %v\n", err)
+		return
+	}
+	fmt.Printf("Filtered OpenVPN exclude-route file created at: %s\n", outFilePath)
+}
+
+// cidrToRoute parses a string like "192.168.1.0/24" into network address ("192.168.1.0") and netmask ("255.255.255.0").
+// This is needed for OpenVPN's "route <network> <netmask> net_gateway" format.
+func cidrToRoute(cidr string) (string, string, error) {
+	_, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse CIDR: %v", err)
+	}
+	// ipNet.IP is the network's starting address. We convert mask to dotted-decimal for OpenVPN.
+	networkAddr := ipNet.IP.To4()
+	if networkAddr == nil {
+		return "", "", fmt.Errorf("IPv6 addresses are not supported in this example")
+	}
+	netmask := ipMaskToDotted(ipNet.Mask)
+	return networkAddr.String(), netmask, nil
+}
+
+// ipMaskToDotted converts a net.IPMask (e.g. /24) to its dotted-decimal string (e.g. "255.255.255.0").
+func ipMaskToDotted(mask net.IPMask) string {
+	if len(mask) != 4 {
+		return ""
+	}
+	return fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
+}
+
+// extractCountryCIDRs scans the local RIPE DB file for inetnum blocks belonging to the specified country code.
+// It returns a list of CIDR strings (e.g. "192.168.0.0/16").
+func extractCountryCIDRs(countryCode, dbPath string, debugPrint bool) []string {
+	// Open the RIPE DB file for reading.
+	file, err := os.Open(dbPath)
 	if err != nil {
 		fmt.Println("Error opening RIPE database:", err)
-		return
+		return nil
 	}
 	defer file.Close()
 
-	// Prepare to read the file block by block.
+	// We always uppercase the user's input so it matches entries in DB.
+	countryCode = strings.ToUpper(countryCode)
+
 	scanner := bufio.NewScanner(file)
 	var ipRanges []string
-	countryCode = strings.ToUpper(countryCode) // Ensure country code is in uppercase for comparison.
-
-	// Variables to hold block data.
 	var blockLines []string
 
+	// We read block-by-block: each block ends on an empty line in the RIPE DB.
 	for {
-		blockLines = nil // Reset the block lines for each new block.
-
-		// Read a block of lines until an empty line is encountered.
+		blockLines = nil
 		for scanner.Scan() {
 			line := scanner.Text()
 			if line == "" {
-				// Empty line indicates the end of a block.
+				// A blank line signals the end of a block.
 				break
 			}
 			blockLines = append(blockLines, line)
@@ -414,10 +503,8 @@ func createBindACLFiltered(countryCode string) {
 			break
 		}
 
-		// Initialize variables to store inetnum and country data from the block.
+		// We'll look in each block for lines beginning with "inetnum:" and "country:".
 		var inetnumLine, countryLine string
-
-		// Process each line in the block to find inetnum and country information.
 		for _, line := range blockLines {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "inetnum:") {
@@ -427,32 +514,32 @@ func createBindACLFiltered(countryCode string) {
 			}
 		}
 
-		// If both inetnum and country data are found, proceed to process the block.
+		// If both inetnum and country are present in this block, we check if it matches our country code.
 		if inetnumLine != "" && countryLine != "" {
-			// Extract the country code from the country line.
 			fields := strings.Fields(countryLine)
 			if len(fields) >= 2 {
 				blockCountryCode := strings.ToUpper(fields[1])
 				if blockCountryCode == countryCode {
-					// Extract the IP range from the inetnum line.
+					// This block belongs to the requested country.
 					inetnumFields := strings.Fields(inetnumLine)
 					if len(inetnumFields) >= 2 {
+						// inetnum: <startIP> - <endIP>
 						ipRangeStr := strings.Join(inetnumFields[1:], " ")
-						// The IP range string is expected to be in the format "startIP - endIP".
 						ipRangeParts := strings.Split(ipRangeStr, "-")
 						if len(ipRangeParts) == 2 {
-							ipRangeStart := strings.TrimSpace(ipRangeParts[0])
-							ipRangeEnd := strings.TrimSpace(ipRangeParts[1])
+							start := strings.TrimSpace(ipRangeParts[0])
+							end := strings.TrimSpace(ipRangeParts[1])
 
-							// Log the found inetnum entry.
-							fmt.Printf("Found inetnum entry: %s - %s\n", ipRangeStart, ipRangeEnd)
+							if debugPrint {
+								fmt.Printf("Found inetnum entry: %s - %s\n", start, end)
+							}
 
-							// Generate a single CIDR block from the IP range.
-							cidr := generateCIDR(ipRangeStart, ipRangeEnd)
-
+							// Convert the range to a single CIDR.
+							cidr := generateCIDR(start, end)
 							if cidr != "" {
-								fmt.Printf("Converted to CIDR: %s\n", cidr)
-								// Add the generated CIDR to the collection of IP ranges.
+								if debugPrint {
+									fmt.Printf("Converted to CIDR: %s\n", cidr)
+								}
 								ipRanges = append(ipRanges, cidr)
 							}
 						}
@@ -460,52 +547,14 @@ func createBindACLFiltered(countryCode string) {
 				}
 			}
 		}
-
-		// Continue to the next block.
 	}
-
-	// Check if any IP ranges were found.
-	if len(ipRanges) == 0 {
-		fmt.Printf("No IP ranges found for country code: %s\n", countryCode)
-		return
-	}
-
-	// Remove duplicate CIDR entries.
-	ipRanges = removeDuplicates(ipRanges)
-
-	// Filter out redundant CIDRs.
-	ipRanges = filterRedundantCIDRs(ipRanges)
-
-	// Sort the IP ranges.
-	sort.Strings(ipRanges)
-
-	// Get the user's home directory to save the file locally.
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Error getting home directory:", err)
-		return
-	}
-	// Create the ACL file path in the user's local directory.
-	aclFilePath := filepath.Join(homeDir, fmt.Sprintf("acl_%s.conf", countryCode))
-
-	// Create the ACL file for BIND.
-	var entries []string
-	for _, cidr := range ipRanges {
-		entries = append(entries, fmt.Sprintf("  %s;", cidr)) // Format each CIDR as a BIND ACL entry.
-	}
-	aclContent := fmt.Sprintf("acl \"%s\" {\n%s\n};\n", countryCode, strings.Join(entries, "\n"))
-
-	// Write the ACL content to the specified file.
-	err = os.WriteFile(aclFilePath, []byte(aclContent), 0644)
-	if err != nil {
-		fmt.Printf("Error writing BIND ACL file: %v\n", err)
-		return
-	}
-	fmt.Printf("Filtered BIND ACL file created at: %s\n", aclFilePath)
+	return ipRanges
 }
 
+// generateCIDR attempts to convert a start IP and end IP into a single CIDR notation (e.g., 192.168.0.0/24).
+// NOTE: This only works correctly if the range aligns with a power-of-two subnet boundary.
 func generateCIDR(startIPStr, endIPStr string) string {
-	// Parses IP addresses
+	// Parse IP addresses into net.IP and force IPv4 for simplicity.
 	startIP := net.ParseIP(startIPStr).To4()
 	endIP := net.ParseIP(endIPStr).To4()
 	if startIP == nil || endIP == nil {
@@ -513,183 +562,151 @@ func generateCIDR(startIPStr, endIPStr string) string {
 		return ""
 	}
 
-	// Converts IPs to uint32 for calculations
+	// Convert them to uint32 to manipulate bits.
 	start := binary.BigEndian.Uint32(startIP)
 	end := binary.BigEndian.Uint32(endIP)
 
-	// Calculate the number of bits to cover the range
+	// XOR to find differing bits, then use bits.Len32() to determine how many bits are different.
 	diff := start ^ end
 	prefixLength := 32 - bits.Len32(diff)
 
-	// Calculate the network address
+	// Zero out the bits after prefixLength to get the network address.
 	network := start &^ ((1 << (32 - prefixLength)) - 1)
 
-	// Convert network address back to IP
+	// Convert the integer back to a dotted-quad IP.
 	networkIP := make(net.IP, 4)
 	binary.BigEndian.PutUint32(networkIP, network)
 
-	// Format CIDR notation
 	cidr := fmt.Sprintf("%s/%d", networkIP.String(), prefixLength)
 	return cidr
 }
 
+// filterRedundantCIDRs iterates through a list of CIDRs, removing those fully contained by any larger CIDR.
 func filterRedundantCIDRs(cidrs []string) []string {
-	// Filters out CIDRs that are fully contained within other CIDRs in the list.
-	var result []string
-	// Parse all CIDRs into net.IPNet structures
-	parsedCIDRs := make([]*net.IPNet, 0, len(cidrs))
+	var parsedCIDRs []*net.IPNet
+
+	// Parse each CIDR string into a *net.IPNet.
 	for _, cidrStr := range cidrs {
-		_, cidrNet, err := net.ParseCIDR(cidrStr)
+		_, ipNet, err := net.ParseCIDR(cidrStr)
 		if err != nil {
 			fmt.Printf("Error parsing CIDR %s: %v\n", cidrStr, err)
 			continue
 		}
-		parsedCIDRs = append(parsedCIDRs, cidrNet)
+		parsedCIDRs = append(parsedCIDRs, ipNet)
 	}
 
-	// Sort the CIDRs by prefix length ascending (shorter prefixes first), then by IP
+	// Sort by (prefix length ascending) and then by IP address ascending.
+	// This ensures that bigger subnets (e.g. /16) come before smaller ones (/24).
 	sort.Slice(parsedCIDRs, func(i, j int) bool {
 		onesI, bitsI := parsedCIDRs[i].Mask.Size()
 		onesJ, bitsJ := parsedCIDRs[j].Mask.Size()
-		// Ensure the same address family
+
+		// Compare the total bits (IPv4 vs IPv6).
 		if bitsI != bitsJ {
 			return bitsI < bitsJ
 		}
+		// Then compare prefix lengths.
 		if onesI != onesJ {
 			return onesI < onesJ
 		}
-		// If prefix lengths are equal, sort by IP address
+		// Finally compare the IP addresses themselves.
 		return bytes.Compare(parsedCIDRs[i].IP, parsedCIDRs[j].IP) < 0
 	})
 
-	// Prepare a list to store the CIDRs we keep
-	keptCIDRs := []*net.IPNet{}
+	var keptCIDRs []*net.IPNet
 
-	// Iterate over the sorted CIDRs
-	for _, cidrNet := range parsedCIDRs {
+	// For each candidate, check if it is contained in any CIDR already kept.
+	for _, candidate := range parsedCIDRs {
 		redundant := false
-		// Check if current CIDR is contained in any of the kept CIDRs
-		for _, keptNet := range keptCIDRs {
-			if cidrContains(keptNet, cidrNet) {
+		for _, keeper := range keptCIDRs {
+			if cidrContains(keeper, candidate) {
 				redundant = true
-				fmt.Printf("Filtered out redundant CIDR: %s (contained in %s)\n", cidrNet.String(), keptNet.String())
+				fmt.Printf("Filtered out redundant CIDR: %s (contained in %s)\n", candidate.String(), keeper.String())
 				break
 			}
 		}
 		if !redundant {
-			keptCIDRs = append(keptCIDRs, cidrNet)
+			keptCIDRs = append(keptCIDRs, candidate)
 		}
 	}
 
-	// Convert the kept CIDRs back to strings
-	for _, cidrNet := range keptCIDRs {
-		result = append(result, cidrNet.String())
+	// Convert the kept CIDRs back into string form.
+	var results []string
+	for _, net := range keptCIDRs {
+		results = append(results, net.String())
 	}
-
-	return result
+	return results
 }
 
+// cidrContains checks if 'inner' is fully contained within 'outer' (they are both IPv4 subnets).
 func cidrContains(outer, inner *net.IPNet) bool {
-	// Checks if 'inner' CIDR is fully contained within 'outer' CIDR
-	// First, check if the outer network contains the first IP of the inner network
+	// First ensure the first IP of inner is in outer.
 	if !outer.Contains(inner.IP) {
 		return false
 	}
-
-	// Calculate the last IP of the inner network
-	innerLastIP := lastIP(inner)
-	// Check if the outer network contains the last IP of the inner network
-	return outer.Contains(innerLastIP)
+	// Compute the last IP of inner's range, and ensure that is also in outer.
+	innerLast := lastIP(inner)
+	return outer.Contains(innerLast)
 }
 
+// lastIP returns the broadcast (last) address in a given subnet range.
 func lastIP(ipNet *net.IPNet) net.IP {
-	// Calculates the last IP address in the CIDR block
 	ip := ipNet.IP.To4()
 	if ip == nil {
-		// IPv6 not supported in this code
+		// We skip IPv6 in this example, but you could add support if needed.
 		return nil
 	}
 	mask := ipNet.Mask
 	network := ip.Mask(mask)
 	broadcast := make(net.IP, len(network))
+
+	// For each byte of the mask, invert the bits to find the broadcast address.
 	for i := 0; i < len(network); i++ {
 		broadcast[i] = network[i] | ^mask[i]
 	}
 	return broadcast
 }
 
+// removeDuplicates discards duplicate strings in a slice while preserving order.
 func removeDuplicates(elements []string) []string {
-	// Removes duplicate strings from a slice.
-	encountered := map[string]bool{}
+	seen := make(map[string]bool)
 	result := []string{}
 
-	for _, v := range elements {
-		if !encountered[v] {
-			encountered[v] = true
-			result = append(result, v)
+	for _, e := range elements {
+		if !seen[e] {
+			seen[e] = true
+			result = append(result, e)
 		}
 	}
 	return result
 }
 
+// showAvailableCountryCodes prints known country codes and their names in alphabetical order by country name. RIPE NCC (Réseaux IP Européens Network Coordination Centre) is one of the five Regional Internet Registries (RIRs) and primarily serves Europe, the Middle East, and parts of Central Asia. Here’s the filtered list of countries that are within the RIPE NCC service region, which overlaps with the European region (including some non-EU countries) and neighboring areas:
+
 func showAvailableCountryCodes() {
 
 	countries := map[string]string{
-		"AD": "Andorra", "AE": "United Arab Emirates", "AF": "Afghanistan", "AG": "Antigua and Barbuda",
-		"AI": "Anguilla", "AL": "Albania", "AM": "Armenia", "AO": "Angola", "AQ": "Antarctica", "AR": "Argentina",
-		"AS": "American Samoa", "AT": "Austria", "AU": "Australia", "AW": "Aruba", "AX": "Aland Islands",
-		"AZ": "Azerbaijan", "BA": "Bosnia and Herzegovina", "BB": "Barbados", "BD": "Bangladesh", "BE": "Belgium",
-		"BF": "Burkina Faso", "BG": "Bulgaria", "BH": "Bahrain", "BI": "Burundi", "BJ": "Benin", "BL": "Saint Barthélemy",
-		"BM": "Bermuda", "BN": "Brunei", "BO": "Bolivia", "BQ": "Bonaire, Sint Eustatius, and Saba", "BR": "Brazil",
-		"BS": "Bahamas", "BT": "Bhutan", "BV": "Bouvet Island", "BW": "Botswana", "BY": "Belarus", "BZ": "Belize",
-		"CA": "Canada", "CC": "Cocos (Keeling) Islands", "CD": "Congo (Kinshasa)", "CF": "Central African Republic",
-		"CG": "Congo (Brazzaville)", "CH": "Switzerland", "CI": "Côte d'Ivoire", "CK": "Cook Islands", "CL": "Chile",
-		"CM": "Cameroon", "CN": "China", "CO": "Colombia", "CR": "Costa Rica", "CU": "Cuba", "CV": "Cape Verde",
-		"CW": "Curaçao", "CX": "Christmas Island", "CY": "Cyprus", "CZ": "Czech Republic", "DE": "Germany",
-		"DJ": "Djibouti", "DK": "Denmark", "DM": "Dominica", "DO": "Dominican Republic", "DZ": "Algeria",
-		"EC": "Ecuador", "EE": "Estonia", "EG": "Egypt", "EH": "Western Sahara", "ER": "Eritrea", "ES": "Spain",
-		"ET": "Ethiopia", "FI": "Finland", "FJ": "Fiji", "FK": "Falkland Islands", "FM": "Micronesia",
-		"FO": "Faroe Islands", "FR": "France", "GA": "Gabon", "GB": "United Kingdom", "GD": "Grenada",
-		"GE": "Georgia", "GF": "French Guiana", "GG": "Guernsey", "GH": "Ghana", "GI": "Gibraltar",
-		"GL": "Greenland", "GM": "Gambia", "GN": "Guinea", "GP": "Guadeloupe", "GQ": "Equatorial Guinea",
-		"GR": "Greece", "GT": "Guatemala", "GU": "Guam", "GW": "Guinea-Bissau", "GY": "Guyana",
-		"HK": "Hong Kong", "HM": "Heard Island and McDonald Islands", "HN": "Honduras", "HR": "Croatia",
-		"HT": "Haiti", "HU": "Hungary", "ID": "Indonesia", "IE": "Ireland", "IL": "Israel", "IM": "Isle of Man",
-		"IN": "India", "IO": "British Indian Ocean Territory", "IQ": "Iraq", "IR": "Iran", "IS": "Iceland",
-		"IT": "Italy", "JE": "Jersey", "JM": "Jamaica", "JO": "Jordan", "JP": "Japan", "KE": "Kenya",
-		"KG": "Kyrgyzstan", "KH": "Cambodia", "KI": "Kiribati", "KM": "Comoros", "KN": "Saint Kitts and Nevis",
-		"KP": "North Korea", "KR": "South Korea", "KW": "Kuwait", "KY": "Cayman Islands", "KZ": "Kazakhstan",
-		"LA": "Laos", "LB": "Lebanon", "LC": "Saint Lucia", "LI": "Liechtenstein", "LK": "Sri Lanka",
-		"LR": "Liberia", "LS": "Lesotho", "LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia", "LY": "Libya",
-		"MA": "Morocco", "MC": "Monaco", "MD": "Moldova", "ME": "Montenegro", "MF": "Saint Martin", "MG": "Madagascar",
-		"MH": "Marshall Islands", "MK": "North Macedonia", "ML": "Mali", "MM": "Myanmar (Burma)", "MN": "Mongolia",
-		"MO": "Macao", "MP": "Northern Mariana Islands", "MQ": "Martinique", "MR": "Mauritania", "MS": "Montserrat",
-		"MT": "Malta", "MU": "Mauritius", "MV": "Maldives", "MW": "Malawi", "MX": "Mexico", "MY": "Malaysia",
-		"MZ": "Mozambique", "NA": "Namibia", "NC": "New Caledonia", "NE": "Niger", "NF": "Norfolk Island",
-		"NG": "Nigeria", "NI": "Nicaragua", "NL": "Netherlands", "NO": "Norway", "NP": "Nepal", "NR": "Nauru",
-		"NU": "Niue", "NZ": "New Zealand", "OM": "Oman", "PA": "Panama", "PE": "Peru", "PF": "French Polynesia",
-		"PG": "Papua New Guinea", "PH": "Philippines", "PK": "Pakistan", "PL": "Poland", "PM": "Saint Pierre and Miquelon",
-		"PN": "Pitcairn Islands", "PR": "Puerto Rico", "PT": "Portugal", "PW": "Palau", "PY": "Paraguay",
-		"QA": "Qatar", "RE": "Réunion", "RO": "Romania", "RS": "Serbia", "RU": "Russia", "RW": "Rwanda",
-		"SA": "Saudi Arabia", "SB": "Solomon Islands", "SC": "Seychelles", "SD": "Sudan", "SE": "Sweden",
-		"SG": "Singapore", "SH": "Saint Helena", "SI": "Slovenia", "SJ": "Svalbard and Jan Mayen", "SK": "Slovakia",
-		"SL": "Sierra Leone", "SM": "San Marino", "SN": "Senegal", "SO": "Somalia", "SR": "Suriname",
-		"SS": "South Sudan", "ST": "São Tomé and Príncipe", "SV": "El Salvador", "SX": "Sint Maarten", "SY": "Syria",
-		"SZ": "Eswatini", "TC": "Turks and Caicos Islands", "TD": "Chad", "TF": "French Southern Territories",
-		"TG": "Togo", "TH": "Thailand", "TJ": "Tajikistan", "TK": "Tokelau", "TL": "Timor-Leste", "TM": "Turkmenistan",
-		"TN": "Tunisia", "TO": "Tonga", "TR": "Turkey", "TT": "Trinidad and Tobago", "TV": "Tuvalu",
-		"TZ": "Tanzania", "UA": "Ukraine", "UG": "Uganda", "UM": "United States Minor Outlying Islands",
-		"US": "United States", "UY": "Uruguay", "UZ": "Uzbekistan", "VA": "Vatican City", "VC": "Saint Vincent and the Grenadines",
-		"VE": "Venezuela", "VG": "British Virgin Islands", "VI": "United States Virgin Islands", "VN": "Vietnam",
-		"VU": "Vanuatu", "WF": "Wallis and Futuna", "WS": "Samoa", "YE": "Yemen", "YT": "Mayotte", "ZA": "South Africa",
-		"ZM": "Zambia", "ZW": "Zimbabwe",
+		"AL": "Albania", "AM": "Armenia", "AT": "Austria", "AZ": "Azerbaijan",
+		"BA": "Bosnia and Herzegovina", "BE": "Belgium", "BG": "Bulgaria",
+		"BY": "Belarus", "CH": "Switzerland", "CY": "Cyprus", "CZ": "Czech Republic",
+		"DE": "Germany", "DK": "Denmark", "EE": "Estonia", "ES": "Spain",
+		"FI": "Finland", "FR": "France", "GE": "Georgia", "GR": "Greece",
+		"HR": "Croatia", "HU": "Hungary", "IE": "Ireland", "IL": "Israel",
+		"IS": "Iceland", "IT": "Italy", "KG": "Kyrgyzstan", "KZ": "Kazakhstan",
+		"LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia", "MD": "Moldova",
+		"ME": "Montenegro", "MK": "North Macedonia", "MT": "Malta", "NL": "Netherlands",
+		"NO": "Norway", "PL": "Poland", "PT": "Portugal", "RO": "Romania",
+		"RS": "Serbia", "RU": "Russia", "SE": "Sweden", "SI": "Slovenia",
+		"SK": "Slovakia", "TJ": "Tajikistan", "TM": "Turkmenistan", "TR": "Turkey",
+		"UA": "Ukraine", "UZ": "Uzbekistan",
 	}
 
-	// Extract and sort country names
+	// We'll create a slice of structs to sort by the country Name value.
 	var countryList []struct {
 		Code string
 		Name string
 	}
+
 	for code, name := range countries {
 		countryList = append(countryList, struct {
 			Code string
@@ -697,14 +714,14 @@ func showAvailableCountryCodes() {
 		}{Code: code, Name: name})
 	}
 
-	// Sort the list by country names
+	// Sort alphabetically by the Name field.
 	sort.Slice(countryList, func(i, j int) bool {
 		return countryList[i].Name < countryList[j].Name
 	})
 
-	// Display sorted country codes and names
-	fmt.Println("Available country codes and their names (sorted by country name):")
-	for _, country := range countryList {
-		fmt.Printf("%s - %s\n", country.Code, country.Name)
+	// Print out each code and name pair in sorted order.
+	fmt.Println("Available country codes and names (sorted by name):")
+	for _, c := range countryList {
+		fmt.Printf("%s - %s\n", c.Code, c.Name)
 	}
 }
