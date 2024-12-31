@@ -262,7 +262,7 @@ func main() {
                 if err != nil {
                     continue
                 }
-                line := fmt.Sprintf("push \"route %s %s\"", startIP, netmask)
+                line := fmt.Sprintf("push \"route %s %s net_gateway\"", startIP, netmask)
                 fmt.Println(line)
             }
 
