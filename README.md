@@ -1,9 +1,8 @@
 <img src="https://raw.githubusercontent.com/matveynator/chicha-whois/refs/heads/master/chicha-whois-logo.png" alt="chicha-whois" width="50%" align="right" />
 
-
 **chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done. Written in Golang.
 
-
+---
 
 ## Downloads
 
@@ -39,6 +38,8 @@ chicha-whois -h
 - `-dns-acl COUNTRYCODE`: Generate a BIND ACL (e.g., `RU`).
 - `-dns-acl-f COUNTRYCODE`: Create a filtered ACL (no redundant subnets).
 - `-l`: Show available country codes.
+- `-ovpn COUNTRYCODE`: Generate OpenVPN exclusion list.
+- `-ovpn-f COUNTRYCODE`: Create a filtered OpenVPN exclusion list.
 - `-h`: Show help.
 
 ---
@@ -68,13 +69,27 @@ chicha-whois -h
    chicha-whois -l
    ```
 
+5. **Generate OpenVPN Exclusion List**  
+   ```bash
+   chicha-whois -ovpn RU
+   ```
+   Outputs `openvpn_exclude_RU.txt` with routes for OpenVPN.
+
+6. **Filtered OpenVPN Exclusion List**  
+   ```bash
+   chicha-whois -ovpn-f RU
+   ```
+   Same as above, but with CIDR aggregation for efficiency.
+
 ---
 
 ## Notes
 
 - **Database saved to**: `~/.ripe.db.cache/ripe.db.inetnum`.  
 - **ACL files saved to**: Your home directory (e.g., `~/acl_RU.conf`).  
+- **OpenVPN exclusion lists saved to**: Your home directory (e.g., `~/openvpn_exclude_RU.txt`).
 
+---
 
 ## BIND9 Configuration for RU and UA Clients
 Copy and paste the following configuration into your BIND9 named.conf:
@@ -129,5 +144,23 @@ sudo named-checkzone domain.com /etc/bind/zones/db.domain.com.ru
 ```
 sudo systemctl restart bind9
 ```
-Done!
+
+---
+
+## EXAMPLE OpenVPN Configuration for country exclusion lists:
+To exclude entire country routes from the VPN tunnel, add the following configuration to the end of your `.ovpn` file:
+
+   ```
+
+   # Redirect all traffic through VPN
+   redirect-gateway def1
+
+   # Exclude KZ IPs from VPN:
+   route 100.43.64.0 255.255.255.0 net_gateway
+   route 100.43.65.0 255.255.255.0 net_gateway
+   route 100.43.66.0 255.255.254.0 net_gateway
+   ```
+
+
+This ensures all routes are added dynamically and excluded from vpn post-connection.
 
