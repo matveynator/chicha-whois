@@ -19,10 +19,22 @@ Need something else? [Check all binaries](https://files.zabiyaka.net/chicha-whoi
 
 ## Installation
 
-On Linux AMD64, install in one line:  
+On Linux AMD64:  
 
 ```bash
 sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+```
+
+On MacOSX Intel:  
+
+```bash
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/macos/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+```
+
+On MacOSX Silicon:  
+
+```bash
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/macos/arm64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
 ```
 
 Done? Try it:  
