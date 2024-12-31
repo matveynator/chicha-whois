@@ -1,169 +1,189 @@
 <img src="https://raw.githubusercontent.com/matveynator/chicha-whois/refs/heads/master/chicha-whois-logo.png" alt="chicha-whois" width="50%" align="right" />
 
-**chicha-whois** is a tiny but powerful CLI tool for working with the RIPE database and generating DNS ACLs. Clean, simple, and gets the job done. Written in Golang.
+
+# chicha-whois
+
+**chicha-whois** — это небольшая, но мощная CLI-утилита на Go для работы с базой RIPE NCC и генерации ACL (Access Control Lists) для BIND / списков для OpenVPN. Предельно проста в использовании и решает необходимые задачи.
 
 ---
 
-## Downloads
+## Скачивание
 
-Pick your binary and get started:
+Выберите нужную вам сборку:
 
 - [Linux AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois)  
 - [Windows AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/windows/amd64/chicha-whois.exe)  
-- [macOS AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois)  
+- [macOS (Intel) AMD64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois)  
 - [Linux ARM64](https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/arm64/chicha-whois)  
 
-Need something else? [Check all binaries](https://files.zabiyaka.net/chicha-whois/latest/no-gui/).
+Другие варианты смотрите в [каталоге всех бинарников](https://files.zabiyaka.net/chicha-whois/latest/no-gui/).
 
 ---
 
-## Installation
+## Установка
 
-On Linux AMD64:
+### Linux (AMD64)
+
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/linux/amd64/chicha-whois -o /usr/local/bin/chicha-whois && \
+sudo chmod +x /usr/local/bin/chicha-whois && \
+/usr/local/bin/chicha-whois --version
 ```
 
-On macOS (Intel):
+### macOS (Intel)
+
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/amd64/chicha-whois -o /usr/local/bin/chicha-whois && \
+sudo chmod +x /usr/local/bin/chicha-whois && \
+/usr/local/bin/chicha-whois --version
 ```
 
-On macOS (Apple Silicon/ARM64):
+### macOS (Apple Silicon, ARM64)
+
 ```bash
-sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/arm64/chicha-whois -o /usr/local/bin/chicha-whois && sudo chmod +x /usr/local/bin/chicha-whois; /usr/local/bin/chicha-whois --version;
+sudo curl -L https://files.zabiyaka.net/chicha-whois/latest/no-gui/mac/arm64/chicha-whois -o /usr/local/bin/chicha-whois && \
+sudo chmod +x /usr/local/bin/chicha-whois && \
+/usr/local/bin/chicha-whois --version
 ```
 
-Done? Test it:
+Проверить установку:
 ```bash
 chicha-whois -h
 ```
 
 ---
 
-## Commands
+## Основные команды
 
-| Option                                  | Description                                                                                                                                                                 |
-|-----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `-u`                                    | Update / download the RIPE NCC database locally.                                                                                                                            |
-| `-dns-acl COUNTRYCODE`                  | Generate a BIND ACL containing all IP ranges for `COUNTRYCODE` (e.g., `RU`). The result is saved as `acl_<COUNTRYCODE>.conf` in your home directory.                         |
-| `-dns-acl-f COUNTRYCODE`                | Same as above, but filters out nested subnets for a smaller, optimized ACL.                                                                                                  |
-| `-ovpn COUNTRYCODE`                     | Generate an OpenVPN exclude-route list with `route <ip> <mask> net_gateway`. Saved as `openvpn_exclude_<COUNTRYCODE>.txt`.                                                  |
-| `-ovpn-f COUNTRYCODE`                   | Same as above, but filters out nested subnets (more efficient routes).                                                                                                       |
-| `-l`                                    | List all available country codes recognized in the RIPE region.                                                                                                              |
-| `-h`, `--help`                          | Display help.                                                                                                                                                                |
-| `-v`, `--version`                       | Show application version.                                                                                                                                                    |
-| **`-search [-dns | -ovpn | -ovpn-push] CC:kw1,kw2...`** | **Advanced search.** Allows searching by optional country code `CC` plus **one or more keywords** (`kw1`, `kw2`, ...). Filters out nested subnets, and **prints** the results to stdout in the chosen format (no file is created).  |
+Ниже список ключевых опций:
 
-### About the `-search` Command
+| **Опция**                                     | **Описание**                                                                                                                                                                                                                       |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-u`                                          | Загрузить / обновить локальную базу RIPE NCC (скачать файл `ripe.db.inetnum.gz` и распаковать его).                                                                                                                                |
+| `-dns-acl COUNTRYCODE`                        | Сгенерировать ACL для BIND (например, `RU`), сохранив в файл `acl_<COUNTRYCODE>.conf` в вашей домашней папке.                                                                                                                      |
+| `-dns-acl-f COUNTRYCODE`                      | То же самое, но **с фильтрацией** вложенных подсетей (меньше записей).                                                                                                                                                              |
+| `-ovpn COUNTRYCODE`                           | Создать список маршрутов для OpenVPN (exclude-route) в файле `openvpn_exclude_<COUNTRYCODE>.txt` (без фильтрации).                                                                                                                  |
+| `-ovpn-f COUNTRYCODE`                         | Аналогично, но с фильтрацией вложенных сетей.                                                                                                                                                                                      |
+| `-l`                                          | Показать список доступных кодов стран (упорядоченный по названию).                                                                                                                                                                 |
+| `-h` или `--help`                             | Вывести справку и краткую информацию об опциях.                                                                                                                                                                                    |
+| `-v` или `--version`                          | Показать версию приложения.                                                                                                                                                                                                         |
+| **`-search [-dns | -ovpn | -ovpn-push] CC:kw1,kw2...`** | **Расширенный поиск.** Позволяет искать по коду страны (опционально) **и/или** по ключевым словам (`kw1`, `kw2` и т.д.). *Всегда* фильтрует вложенные подсети и **выводит** результат прямо в консоль (не в файл) в одном из форматов: DNS/OVPN/OVPN (push). |
 
-- Format:  
+### О команде `-search`
+
+- **Формат вызова**:
   ```
-  chicha-whois -search [-dns | -ovpn | -ovpn-push] CC:kw1,kw2...
+  chicha-whois -search [-dns | -ovpn | -ovpn-push] CC:слово1,слово2,слово3
   ```
-  
-- **Country code** (`CC`) is optional.  
-  - If you leave it empty (like `:kw1,kw2`), it will match blocks from **any** country if the keywords are found.  
-  - If you specify a code (e.g., `RU`), it will only match blocks containing `country: RU`.
-  
-- **Keywords** are comma-separated. The tool searches for them in each RIPE DB block (case-insensitive). If a block contains at least one of these keywords, it is considered a match.
+  Где `CC` — (опциональный) код страны, а после двоеточия — список ключевых слов, разделённых запятыми.
 
-- **Sub-flags** for `-search`:
-  - **`-dns`**: Print results in a DNS BIND ACL style (e.g. `acl "RU" { 1.2.3.0/24; };`).
-  - **`-ovpn`**: Print results in an OpenVPN client style (`route <ip> <mask> net_gateway`).
-  - **`-ovpn-push`**: Print results in an OpenVPN server push style (`push "route <ip> <mask>"`).
-
-- **Example**:
+- Примеры:
   ```bash
-  # Search for RU blocks containing any of these keywords: ok.ru, vk.ru, drive2.ru
-  # Print them in DNS ACL style to the console (not saved to file):
+  # Ищем в стране RU блоки, содержащие хотя бы одно из слов "ok.ru", "vk.ru", "drive2.ru"
+  # Выводим результат в формате DNS ACL прямо на экран (без сохранения в файл):
   chicha-whois -search -dns RU:ok.ru,vk.ru,drive2.ru
   ```
-  
+
   ```bash
-  # Search for blocks in any country (no CC) containing google.com, amazon, cloudflare
-  # Print them as OpenVPN server "push" routes in the console:
+  # Ищем по любым странам (перед двоеточием пусто) ключевые слова: "google.com", "amazon", "cloudflare"
+  # и печатаем как push-маршруты для OpenVPN (в серверном стиле):
   chicha-whois -search -ovpn-push :google.com,amazon,cloudflare
   ```
-  
-- **Nested subnet filtering** is always applied when using `-search`, so you get the most optimized list of CIDRs without overlaps.
+
+- Если перед двоеточием **пусто** (`:kw1,kw2`), поиск идёт во всех блоках независимо от `country:`.  
+- Если указан код страны (`RU:...`), тогда ищем только в блоках, у которых `country: RU`.  
+- Ключевые слова ищутся **без учёта регистра** во всех строчках блока (organization, address и т.д.).  
+- **Фильтрация вложенных подсетей** всегда включена — итоговые CIDR не будут дублировать друг друга.  
+- **Вывод** поддерживает три формата:
+  - `-dns`: BIND-ACL в стиле  
+    ```bind
+    acl "RU" {
+      1.2.3.0/24;
+      2.3.4.0/16;
+    };
+    ```
+  - `-ovpn`: клиентский вариант (`route <ip> <mask> net_gateway`)  
+  - `-ovpn-push`: серверный вариант (`push "route <ip> <mask>"`)
+
+> Если формат не указан, CIDR-диапазоны просто выводятся списком.
+
 
 ---
 
-## Examples
+## Примеры использования
 
-1. **Update the RIPE database**  
+1. **Обновить базу RIPE**  
    ```bash
    chicha-whois -u
    ```
-   Downloads the latest `ripe.db.inetnum.gz` and decompresses it locally.
+   Скачивает последнюю версию базы `ripe.db.inetnum.gz` и распаковывает её в `~/.ripe.db.cache/`.
 
-2. **Create a DNS ACL for Russia**  
+2. **Создать ACL для России (DNS BIND)**  
    ```bash
    chicha-whois -dns-acl RU
    ```
-   Generates `acl_RU.conf` in your home directory.
+   Получаете файл `acl_RU.conf` с полным списком IP-сетей для России (без фильтра).
 
-3. **Optimized DNS ACL for Russia**  
+3. **Оптимизированный ACL**  
    ```bash
    chicha-whois -dns-acl-f RU
    ```
-   Same as above but filters out redundant subnets.
+   То же самое, но отфильтрованные подсети: меньше записей, нет вложенных.
 
-4. **List all country codes**  
+4. **Список кодов стран**  
    ```bash
    chicha-whois -l
    ```
-   Example result: RU - Russia, UA - Ukraine, etc.
+   Выводит, например, `RU - Russia`, `UA - Ukraine` и т.д.
 
-5. **Generate an OpenVPN Exclusion List**  
+5. **OpenVPN exclude-route для RU**  
    ```bash
    chicha-whois -ovpn RU
    ```
-   Creates `openvpn_exclude_RU.txt` with route statements (unfiltered).
+   Создаёт `openvpn_exclude_RU.txt` с маршрутами типа `route 1.2.3.0 255.255.255.0 net_gateway`.
 
-6. **Filtered OpenVPN Exclusion List**  
+6. **Фильтрация для OpenVPN**  
    ```bash
    chicha-whois -ovpn-f RU
    ```
-   Same as above, but with CIDR aggregation to remove nested subnets.
+   Аналогично, но удаляет вложенные / дублирующиеся сети.
 
-7. **Search by country code and keywords**  
+7. **Поиск по стране и ключевым словам**  
    ```bash
    chicha-whois -search -dns UA:google.com,kyivstar,mts
    ```
-   - Finds all UA (`country: UA`) blocks that contain **any** of these keywords (`google.com`, `kyivstar`, `mts`) in the RIPE data.  
-   - Removes duplicates and nested subnets.  
-   - Prints them in a DNS ACL style block directly to the console.
+   - Находит в базе `inetnum`-блоки, у которых `country: UA` + в тексте фигурируют хотя бы одно из слов (`google.com`, `kyivstar`, `mts`).
+   - Фильтрует вложенные CIDR.
+   - Печатает результат в BIND-стиле ACL сразу в консоль.
 
-8. **Search with no country code**  
+8. **Поиск без указания страны**  
    ```bash
    chicha-whois -search -ovpn-push :cloudflare,amazon
    ```
-   - Matches **any** country if the block has at least one keyword.  
-   - Prints them in server-style push format (for inclusion in an OpenVPN server config).
+   - Игнорируем поле `country:` — берём любую страну, если в блоке есть `cloudflare` или `amazon`.
+   - Результат выводится в формате `push "route ..."` для серверной части OpenVPN (тоже только на экран).
 
 ---
 
-## Notes
+## Дополнительно
 
-- **Local DB Path**: `~/.ripe.db.cache/ripe.db.inetnum`  
-- **DNS ACL Output**: `~/acl_<COUNTRYCODE>.conf` (for `-dns-acl` / `-dns-acl-f`).  
-- **OpenVPN Output**: `~/openvpn_exclude_<COUNTRYCODE>.txt` (for `-ovpn` / `-ovpn-f`).  
-- **`-search`** does **not** save output to file; everything is printed to stdout.  
+- **Путь к локальной базе**: `~/.ripe.db.cache/ripe.db.inetnum`  
+- **DNS ACL** (опции `-dns-acl`/`-dns-acl-f`): сохраняются в `~/acl_<COUNTRYCODE>.conf`  
+- **OpenVPN** (опции `-ovpn`/`-ovpn-f`): сохраняются в `~/openvpn_exclude_<COUNTRYCODE>.txt`  
+- **Поиск** (`-search`): **не** пишет файлы, а выводит всё в консоль.
 
 ---
 
-## BIND9 Configuration Example (for RU & UA)
+## Пример настройки BIND9
 
-You can include these files (generated via `-dns-acl`) in your `named.conf`:
+Допустим, вы создали ACL-файлы для RU и UA:
 
 ```
 include "/etc/bind/acl_RU.conf";
 include "/etc/bind/acl_UA.conf";
 
 view "Russia" {
-    match-clients { RU; };  # RU clients
+    match-clients { RU; };  # RU
     zone "domain.com" {
         type master;
         file "/etc/bind/zones/db.domain.com.RU";
@@ -171,7 +191,7 @@ view "Russia" {
 };
 
 view "Ukraine" {
-    match-clients { UA; };  # UA clients
+    match-clients { UA; };  # UA
     zone "domain.com" {
         type master;
         file "/etc/bind/zones/db.domain.com.UA";
@@ -179,7 +199,7 @@ view "Ukraine" {
 };
 
 view "default" {
-    match-clients { any; };  # All other clients
+    match-clients { any; };
     zone "domain.com" {
         type master;
         file "/etc/bind/zones/db.domain.com.default";
@@ -187,34 +207,51 @@ view "default" {
 };
 ```
 
-- Save ACLs to `/etc/bind/acl_RU.conf` and `/etc/bind/acl_UA.conf`.
-- Create corresponding zone files, e.g.:
+- ACL-файлы можно положить, например, в `/etc/bind/acl_RU.conf` и `/etc/bind/acl_UA.conf`.
+- Внутри каждого `acl_RU.conf` будет примерно:
+  ```bind
+  acl "RU" {
+    100.43.64.0/24;
+    100.43.65.0/24;
+    ...
+  };
+  ```
+- Не забудьте создать соответствующие zone-файлы:
   ```
   /etc/bind/zones/db.domain.com.RU
   /etc/bind/zones/db.domain.com.UA
   /etc/bind/zones/db.domain.com.default
   ```
-- Check config with `sudo named-checkconf`, then reload with `sudo systemctl restart bind9`.
+- Проверка:
+  ```
+  sudo named-checkconf
+  sudo systemctl restart bind9
+  ```
 
 ---
 
-## OpenVPN Exclusion Example
+## Пример настройки OpenVPN
 
-To exclude entire country routes from your VPN tunnel, append lines like these to your `.ovpn` client config:
+Чтобы исключить маршруты целой страны из туннеля, можно добавить в `.ovpn` (клиентский конфиг) следующие строки:
 
 ```bash
-# Redirect all traffic through VPN
+# Пропускаем весь трафик через VPN:
 redirect-gateway def1
 
-# Exclude RU IPs from VPN
+# Исключаем (маршруты RU идут вне VPN):
 route 100.43.64.0 255.255.255.0 net_gateway
 route 100.43.65.0 255.255.255.0 net_gateway
-route 100.43.66.0 255.255.254.0 net_gateway
+...
 ```
 
-This ensures those specific subnets do **not** go through the VPN tunnel. If you want to **push** routes from the server side, you can use the `-ovpn-push` search flag to generate lines like `push "route <ip> <mask>"`.
+Если нужно «толкать» такие маршруты с **серверной** стороны, используйте формат с `push "route ..."` — это можно сгенерировать через `-search -ovpn-push` или вручную дописать в серверный `server.conf`:
+
+```bash
+push "redirect-gateway def1"
+push "route 100.43.64.0 255.255.255.0"
+...
+```
 
 ---
 
-
-Enjoy **chicha-whois**! If you have any questions or improvements, feel free to open an issue or a pull request.
+Наслаждайтесь **chicha-whois**! Если есть предложения или вопросы, создайте Issue или Pull Request в репозитории.
